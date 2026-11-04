@@ -1,13 +1,11 @@
-Remmy
+nanoRPC
 =======
 
-Remmy is a simple but usable RPC library. Thanks to the structural simplicity of the code, it is suitable for use in education as well.
+nanoRPC 是我（[yangliangwei](https://github.com/yangliangwei0623)）的个人 C++ RPC 项目，用于学习、实践和持续改进 RPC 的实现。
 
-The communication layer can be implemented with any network library. Currently, we support ASIO and ZeroMQ as the network layer.
+本项目参考并基于 [Remmy](https://github.com/hjk41/Remmy) 开发，感谢原项目提供的实现。当前使用 C++17，支持 ASIO 和 ZeroMQ 通信层。
 
-Current implementation uses C++17, so you need a new compiler to compile the code.
-
-Tested on both Linux and Windows (Visual Studio 2019).
+目前已在 Linux 下验证 ASIO 示例。源码目录、命名空间和示例程序仍沿用 `remmy` 命名。
 
 Linux 本地运行（ASIO）
 -------
@@ -36,39 +34,39 @@ cmake --build --preset asio
 Compiling Test
 =======
 
-test/test.cpp is a simple test demonstrating how to use Remmy. You can compile it with `CMake`, `make`, or `Visual Studio`.
+test/test.cpp is a simple test demonstrating how to use nanoRPC. You can compile it with `CMake`, `make`, or `Visual Studio`.
 
 **Compiling With CMake**
 
 To compile with `CMake`, use the following command:
 ```bash
-user@myhost:~/projects/Remmy$ mkdir build
-user@myhost:~/projects/Remmy$ cd build
-user@myhost:~/projects/Remmy/build$ cmake .. -DCOMM_LAYER=ASIO
+user@myhost:~/projects/nanoRPC$ mkdir build
+user@myhost:~/projects/nanoRPC$ cd build
+user@myhost:~/projects/nanoRPC/build$ cmake .. -DCOMM_LAYER=ASIO
 -- The C compiler identification is GNU 7.4.0
 -- The CXX compiler identification is GNU 7.4.0
 -- ...
 -- Configuring done
 -- Generating done
--- Build files have been written to: /home/user/projects/Remmy/build
-user@myhost:~/projects/Remmy/build$ make
+-- Build files have been written to: /home/user/projects/nanoRPC/build
+user@myhost:~/projects/nanoRPC/build$ make
 Scanning dependencies of target remmy_test
 [ 50%] Building CXX object CMakeFiles/remmy_test.dir/test/test.cpp.o
 [100%] Linking CXX executable remmy_test
 [100%] Built target remmy_test
 ```
 
-Note that we use `-DCOMM_LAYER=ASIO` option for `CMake` here. Remmy supports ASIO and ZMQ. Here we choose ASIO as the communication layer.
+Note that we use `-DCOMM_LAYER=ASIO` option for `CMake` here. nanoRPC supports ASIO and ZMQ. Here we choose ASIO as the communication layer.
 
 If you want to use ZeroMQ, you also need to install libzmq.
 
 **Compiling With `make`**
 
-There is a Makefile under `Remmy/test`, which can be used to compile the test. The communication can be switched by defining the `USE_ASIO` or `USE_ZMQ` at the top of the Makefile.
+There is a Makefile under `nanoRPC/test`, which can be used to compile the test. The communication can be switched by defining the `USE_ASIO` or `USE_ZMQ` at the top of the Makefile.
 
 **Building With VS 2017/2019**
 
-`Remmy/remmy.sln` is a VS 2019 solution file. You can use VS 2019 to open the solution and compile the test project. However, if you choose to use VS 2017, you need to retarget the solution before you can build it. To retarget the solution, open it and right-click on the `Solution 'Remmy'` in `Solution Explorer`, then choose `Retarget Solution`. In the pop-up windows, choose `latest installed version` for `Windows SDK Version`.
+`remmy.sln` is a VS 2019 solution file. You can use VS 2019 to open the solution, select C++17 in the project settings, and compile the test project. However, if you choose to use VS 2017, you need to retarget the solution before you can build it. To retarget the solution, open it and right-click on the `Solution 'Remmy'` in `Solution Explorer`, then choose `Retarget Solution`. In the pop-up windows, choose `latest installed version` for `Windows SDK Version`.
 
 By default the solution uses ASIO as the communication layer. Switching to ZeroMQ requires defining `USE_ZMQ` and `USE_ASIO` macros in project properties. You will also need to specify the location to ZeroMQ library when using ZeroMQ.
 
@@ -127,7 +125,7 @@ public:
     std::cout << "response = " << proto.resp << std::endl;
 ```
 
-Please refer to [/test/test.cpp](/test/test.cpp) for an example on how to use Remmy.
+Please refer to [test/test.cpp](test/test.cpp) for an example on how to use nanoRPC.
 
 
 Contributing
