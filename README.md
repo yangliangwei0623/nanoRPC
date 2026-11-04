@@ -5,9 +5,32 @@ Remmy is a simple but usable RPC library. Thanks to the structural simplicity of
 
 The communication layer can be implemented with any network library. Currently, we support ASIO and ZeroMQ as the network layer.
 
-Current implementation uses C++14, so you need a new compiler to compile the code.
+Current implementation uses C++17, so you need a new compiler to compile the code.
 
 Tested on both Linux and Windows (Visual Studio 2019).
+
+Linux 本地运行（ASIO）
+-------
+
+需要支持 C++17 的编译器、Make 和 CMake 3.21 或更新版本。Ubuntu / Debian 可安装：
+
+```bash
+sudo apt update
+sudo apt install build-essential cmake
+```
+
+在项目根目录执行：
+
+```bash
+git submodule update --init --recursive
+cmake --preset asio
+cmake --build --preset asio
+./build/asio/remmy_test
+```
+
+`asio` 预设使用仓库内的 ASIO 依赖，启用 C++17 和 Debug 构建，无需另外安装 ZeroMQ。
+示例会自行启动服务端和客户端，使用 TCP 4444 端口，输出 `resp = 16` 和
+`resp = 9` 后退出。若选择 ZMQ 通信层，则需额外安装 `libzmq3-dev`。
 
 
 Compiling Test

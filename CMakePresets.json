@@ -1,0 +1,29 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "asio",
+      "displayName": "ASIO (Debug)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/asio",
+      "cacheVariables": {
+        "COMM_LAYER": "ASIO",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.10",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "asio",
+      "configurePreset": "asio",
+      "jobs": 2
+    }
+  ]
+}

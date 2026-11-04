@@ -1,6 +1,7 @@
 #pragma once
-
 #include <cstdint>
+#include <functional>
+#include <tuple>
 #include <iostream>
 #include "serialize.h"
 #include "streambuffer.h"
@@ -139,49 +140,10 @@ namespace remmy {
 		virtual void UnmarshallResponse(StreamBuffer &) {}
 
 		virtual void HandleRequest(void* functor) {
-			std::function<void(const RequestT& req)>* f 
-				= dynamic_cast<std::function<void(const RequestT& req)>*>(functor);
-			f(request);
+			auto* f = static_cast<std::function<void(const RequestT&)>*>(functor);
+			(*f)(request);
 		}
 	};
-
-    namespace _detail {
-        template<size_t N>
-        struct Apply {
-            template<typename F, typename T, typename... A>
-            static inline auto apply(F && f, T && t, A &&... a)
-                -> decltype(Apply<N - 1>::apply(
-                    ::std::forward<F>(f), ::std::forward<T>(t),
-                    ::std::get<N - 1>(::std::forward<T>(t)), ::std::forward<A>(a)...
-                ))
-            {
-                return Apply<N - 1>::apply(::std::forward<F>(f), ::std::forward<T>(t),
-                    ::std::get<N - 1>(::std::forward<T>(t)), ::std::forward<A>(a)...
-                );
-            }
-        };
-
-        template<>
-        struct Apply<0> {
-            template<typename F, typename T, typename... A>
-            static inline auto apply(F && f, T &&, A &&... a)
-                -> decltype(::std::forward<F>(f)(::std::forward<A>(a)...))
-            {
-                return ::std::forward<F>(f)(::std::forward<A>(a)...);
-            }
-        };
-
-        template<typename F, typename T>
-        inline auto apply(F && f, T && t)
-            -> decltype(Apply< ::std::tuple_size<
-                typename ::std::decay<T>::type
-            >::value>::apply(::std::forward<F>(f), ::std::forward<T>(t)))
-        {
-            return Apply< ::std::tuple_size<
-                typename ::std::decay<T>::type
-            >::value>::apply(::std::forward<F>(f), ::std::forward<T>(t));
-        }
-    }
 
     template<uint64_t UID, typename ResponseT, typename... RequestTs>
     class SyncProtocol : public ProtocolBase {
@@ -212,7 +174,7 @@ namespace remmy {
 
         virtual void HandleRequest(void* functor) {
             FuncT* f = (FuncT*)(functor);
-            response = _detail::apply(*f, request);
+            response = std::apply(*f, request);
         }
     };
 
@@ -239,7 +201,7 @@ namespace remmy {
 
         virtual void HandleRequest(void* functor) {
             FuncT* f = (FuncT*)(functor);
-            _detail::apply(*f, request);
+            std::apply(*f, request);
         }
     };
 
@@ -270,9 +232,7 @@ namespace remmy {
         virtual void UnmarshallResponse(StreamBuffer& buf) {}
 
         virtual void HandleRequest(void* functor) {
-//            FuncT* f = (FuncT*)(functor);
-//            _detail::apply(*f, request);
-            _detail::apply(func, request);
+            std::apply(func, request);
         }
     };
 };
