@@ -3,14 +3,14 @@ nanoRPC
 
 nanoRPC 是我（[yangliangwei](https://github.com/yangliangwei0623)）的个人 C++ RPC 项目，用于学习、实践和持续改进 RPC 的实现。
 
-本项目参考并基于 [Remmy](https://github.com/hjk41/Remmy) 开发，感谢原项目提供的实现。当前使用 C++17，支持 ASIO 和 ZeroMQ 通信层。
+本项目参考并基于 [Remmy](https://github.com/hjk41/Remmy) 开发，感谢原项目提供的实现。当前使用 C++20，支持 ASIO 和 ZeroMQ 通信层。
 
 目前已在 Linux 下验证 ASIO 示例。源码目录、命名空间和示例程序仍沿用 `remmy` 命名。
 
 Linux 本地运行（ASIO）
 -------
 
-需要支持 C++17 的编译器、Make 和 CMake 3.21 或更新版本。Ubuntu / Debian 可安装：
+需要支持 C++20（含 Concepts）的编译器和 Make；普通 CMake 构建要求 3.12 或更新版本，使用预设要求 3.21 或更新版本。Ubuntu / Debian 可安装：
 
 ```bash
 sudo apt update
@@ -23,12 +23,25 @@ sudo apt install build-essential cmake
 git submodule update --init --recursive
 cmake --preset asio
 cmake --build --preset asio
+ctest --preset asio
 ./build/asio/remmy_test
 ```
 
-`asio` 预设使用仓库内的 ASIO 依赖，启用 C++17 和 Debug 构建，无需另外安装 ZeroMQ。
-示例会自行启动服务端和客户端，使用 TCP 4444 端口，输出 `resp = 16` 和
+`asio` 预设使用仓库内的 ASIO 依赖，启用 C++20 和 Debug 构建，无需另外安装 ZeroMQ。
+示例会自行启动服务端和客户端，使用系统分配的空闲 TCP 端口，输出 `resp = 16` 和
 `resp = 9` 后退出。若选择 ZMQ 通信层，则需额外安装 `libzmq3-dev`。
+
+Release 构建和测试可使用 `asio-release` 预设：
+
+```bash
+cmake --preset asio-release
+cmake --build --preset asio-release
+ctest --preset asio-release
+```
+
+CTest 覆盖序列化、等待通知、ASIO 错误恢复、Lambda 注册及零参数 RPC，
+所有测试均设置进程超时，Release 下也保留结果检查。
+
 
 
 Compiling Test
@@ -43,8 +56,8 @@ To compile with `CMake`, use the following command:
 user@myhost:~/projects/nanoRPC$ mkdir build
 user@myhost:~/projects/nanoRPC$ cd build
 user@myhost:~/projects/nanoRPC/build$ cmake .. -DCOMM_LAYER=ASIO
--- The C compiler identification is GNU 7.4.0
--- The CXX compiler identification is GNU 7.4.0
+-- The C compiler identification is GNU 13.3.0
+-- The CXX compiler identification is GNU 13.3.0
 -- ...
 -- Configuring done
 -- Generating done
@@ -64,9 +77,9 @@ If you want to use ZeroMQ, you also need to install libzmq.
 
 There is a Makefile under `nanoRPC/test`, which can be used to compile the test. The communication can be switched by defining the `USE_ASIO` or `USE_ZMQ` at the top of the Makefile.
 
-**Building With VS 2017/2019**
+**Building With VS 2019/2022**
 
-`remmy.sln` is a VS 2019 solution file. You can use VS 2019 to open the solution, select C++17 in the project settings, and compile the test project. However, if you choose to use VS 2017, you need to retarget the solution before you can build it. To retarget the solution, open it and right-click on the `Solution 'Remmy'` in `Solution Explorer`, then choose `Retarget Solution`. In the pop-up windows, choose `latest installed version` for `Windows SDK Version`.
+`remmy.sln` is a VS 2019 solution file. Use VS 2019 16.11 or newer (including VS 2022) with a C++20-capable toolset. Debug and Release both enable C++20 and the conforming preprocessor. Retarget the toolset and Windows SDK to your installed versions if needed.
 
 By default the solution uses ASIO as the communication layer. Switching to ZeroMQ requires defining `USE_ZMQ` and `USE_ASIO` macros in project properties. You will also need to specify the location to ZeroMQ library when using ZeroMQ.
 

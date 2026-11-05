@@ -50,6 +50,8 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
@@ -67,6 +69,8 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>

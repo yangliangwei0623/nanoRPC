@@ -2,7 +2,14 @@
 
 #if USE_ZMQ
 #include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <exception>
+#include <functional>
+#include <memory>
+#include <utility>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -125,7 +132,7 @@ namespace remmy{
              * at most 1024 open connections per context. So if we exceeds
              * this amount, we should create a new context.
             */
-            const static size_t FD_PER_CONTEXT = 1000;
+            static constexpr size_t FD_PER_CONTEXT = 1000;
             std::unordered_map<ZmqEP, zmq::socket_t> sockets_;
             std::vector<zmq::context_t> contexts_;
         public:
@@ -256,7 +263,7 @@ namespace remmy{
             while (!kill_) {
                 zmq_poll(items, 1, 1000);
                 if (items[0].revents & ZMQ_POLLIN) {
-                    MessagePtr msg(new MessageType);
+                    auto msg = std::make_shared<MessageType>();
                     msg->SetStatus(ErrorCode::SUCCESS);
                     // TODO: avoid memory copy
                     zmq::message_t zmsg;

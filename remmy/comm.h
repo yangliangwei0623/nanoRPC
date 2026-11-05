@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -15,7 +16,7 @@ namespace remmy {
         RECEIVE_ERROR = 5
     };
 
-    const static uint32_t PKG_MAGIC_HEAD = 0x82011205;
+    static constexpr uint32_t PKG_MAGIC_HEAD = 0x82011205;
     /**
      * A communication implementation. New communication can be implemented by deriving from
      * This class.
@@ -25,8 +26,8 @@ namespace remmy {
     template<class EndPointT>
     class CommBase {
     public:
-        typedef Message<EndPointT> MessageType;
-        typedef std::shared_ptr<MessageType> MessagePtr;
+        using MessageType = Message<EndPointT>;
+        using MessagePtr = std::shared_ptr<MessageType>;
 
         CommBase(){};
         virtual ~CommBase(){};

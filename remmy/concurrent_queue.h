@@ -1,6 +1,7 @@
 #pragma once
 
 #include <condition_variable>
+#include <cstddef>
 #include <limits>
 #include <list>
 #include <mutex>
@@ -26,7 +27,7 @@ namespace remmy {
         }
 
         bool Pop(T & rv) {
-            std::unique_lock<std::mutex> lk(mutex_);
+            std::unique_lock lk(mutex_);
             while (queue_.empty() && !exit_now_)
                 cv_.wait(lk);
             if (queue_.empty())
@@ -39,26 +40,26 @@ namespace remmy {
         }
 
         std::list<T> PopAll() {
-            std::lock_guard<std::mutex> lk(mutex_);
+            std::lock_guard lk(mutex_);
             std::list<T> rv;
             rv.swap(queue_);
             return rv;
         }
 
         size_t Size() {
-            std::lock_guard<std::mutex> lk(mutex_);
+            std::lock_guard lk(mutex_);
             return queue_.size();
         }
 
         void SignalForKill() {
-            std::lock_guard<std::mutex> lk(mutex_);
+            std::lock_guard lk(mutex_);
             exit_now_ = true;
             cv_.notify_all();
         }
     private:
         template<typename TT>
         bool PushImpl(TT&& e) {
-            std::unique_lock<std::mutex> lk(mutex_);
+            std::unique_lock lk(mutex_);
             while (queue_.size() >= max_elements_ && !exit_now_)
                 cv_.wait(lk);
             if (queue_.size() >= max_elements_)

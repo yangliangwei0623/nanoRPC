@@ -1,4 +1,6 @@
+#include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -9,6 +11,40 @@ using namespace std;
 
 #include "remmy/remmy.h"
 using namespace remmy;
+
+namespace {
+    struct ConstSerialize {
+        void Serialize(StreamBuffer&) const;
+        void Deserialize(StreamBuffer&);
+    };
+
+    struct NonConstSerialize {
+        void Serialize(StreamBuffer&);
+        void Deserialize(StreamBuffer&);
+    };
+
+    struct OverloadedSerialize {
+        void Serialize(StreamBuffer&);
+        void Serialize(StreamBuffer&) const;
+        void Deserialize(StreamBuffer&);
+    };
+
+    struct ConstDeserialize {
+        void Serialize(StreamBuffer&) const;
+        void Deserialize(StreamBuffer&) const;
+    };
+
+    static_assert(remmy::_has_serialize<ConstSerialize>::value,
+                  "Const Serialize and non-const Deserialize must be accepted");
+    static_assert(!remmy::_has_serialize<NonConstSerialize>::value,
+                  "Non-const-only Serialize must not pass member detection");
+    static_assert(remmy::_has_serialize<OverloadedSerialize>::value,
+                  "A const Serialize overload must be accepted");
+    static_assert(!remmy::_has_serialize<ConstDeserialize>::value,
+                  "Deserialize must match the non-const member signature");
+    static_assert(!remmy::_has_serialize<int>::value,
+                  "Non-class types must not pass member detection");
+}
 
 struct ComplexType {
     int x;
@@ -66,18 +102,22 @@ public:
 };
 
 #if USE_ASIO
-typedef remmy::CommAsio CommT;
-typedef remmy::AsioEP EP;
+using CommT = remmy::CommAsio;
+using EP = remmy::AsioEP;
 #else
-typedef remmy::CommZmq CommT;
-typedef remmy::ZmqEP EP;
+using CommT = remmy::CommZmq;
+using EP = remmy::ZmqEP;
 #endif
 
 int main(int argc, char ** argv) {
     const uint64_t ADD_OP = UniqueId("add");
     const uint64_t MUL_OP = UniqueId("mul");
     // create a server
+    #if USE_ASIO
+    int port = 0; // Let the OS choose a free port for the example.
+    #else
     int port = 4444;
+    #endif
     CommT comm("127.0.0.1", port);
     remmy::RPCStub<EP> rpc(&comm, 1);
     // Register protocols the server provides
@@ -97,7 +137,7 @@ int main(int argc, char ** argv) {
     // now, create a client
 
     #if USE_ASIO
-    AsioEP ep(asio::ip::address::from_string("127.0.0.1"), port);
+    AsioEP ep = comm.EP();
     #else
     EP ep("127.0.0.1", port);
     #endif
@@ -106,11 +146,12 @@ int main(int argc, char ** argv) {
     for(int i = 0; i < 1; i++) rpc.RpcCallAsync<ADD_OP>(ep, 1, 2);
     remmy::ErrorCode ec;
     for (int i = 0; i < 1; i++) {
-        int x = rand(), y = rand();
+        int x = rand() % 100, y = rand() % 100;
         int r = 0;
         ec = rpc.RpcCall<MUL_OP>(ep, 0, r, x, y);
         if (ec != remmy::ErrorCode::SUCCESS) {
             cout << "error occurred when making sync call: " << (int)ec << endl;
+            return 1;
         }
         else {
             //cout << x << " * " << y << " = " << r << endl;
@@ -126,18 +167,22 @@ int main(int argc, char ** argv) {
     ec = rpc.RpcCall(ep, proto);
     if (ec != remmy::ErrorCode::SUCCESS) {
         cout << "error occurred when making sync call: " << (int)ec << endl;
+        return 1;
     }
     else {
         cout << "resp = " << proto.resp << endl;
+        REMMY_ASSERT(proto.resp == proto.req.x + 6, "wrong custom protocol result");
     }
 
     proto.req.x = 3;
     ec = rpc.RpcCall(ep, proto);
     if (ec != remmy::ErrorCode::SUCCESS) {
         cout << "error occurred when making sync call: " << (int)ec << endl;
+        return 1;
     }
     else {
         cout << "resp = " << proto.resp << endl;
+        REMMY_ASSERT(proto.resp == proto.req.x + 6, "wrong custom protocol result");
     }
     return 0;
 }

@@ -4,12 +4,21 @@
 #define WIN32_LEAN_AND_MEAN
 #include <array>
 #include <atomic>
+#include <utility>
 #include "asio.hpp"
+#include <chrono>
+#include <condition_variable>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <exception>
+#include <functional>
+#include <memory>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <mutex>
+#include <vector>
 #include "concurrent_queue.h"
 #include "logging.h"
 #include "message.h"
@@ -34,16 +43,16 @@ namespace std {
 }
 
 namespace remmy {
-    typedef asio::ip::tcp::endpoint AsioEP;
-    typedef asio::ip::tcp::socket AsioSocket;
-    typedef std::unique_ptr<AsioSocket> AsioSocketPtr;
-    typedef asio::ip::tcp::acceptor AsioAcceptor;
-    typedef asio::io_service AsioService;
-    typedef asio::ip::address AsioAddr;
-    typedef std::shared_ptr<std::condition_variable> CvPtr;
-    typedef std::lock_guard<std::mutex> LockGuard;
-    typedef asio::mutable_buffer AsioMutableBuffer;
-    typedef std::shared_ptr<asio::mutable_buffer> AsioBufferPtr;
+    using AsioEP = asio::ip::tcp::endpoint;
+    using AsioSocket = asio::ip::tcp::socket;
+    using AsioSocketPtr = std::unique_ptr<AsioSocket>;
+    using AsioAcceptor = asio::ip::tcp::acceptor;
+    using AsioService = asio::io_service;
+    using AsioAddr = asio::ip::address;
+    using CvPtr = std::shared_ptr<std::condition_variable>;
+    using LockGuard = std::lock_guard<std::mutex>;
+    using AsioMutableBuffer = asio::mutable_buffer;
+    using AsioBufferPtr = std::shared_ptr<asio::mutable_buffer>;
 
 	template<>
     inline AsioEP MakeEP<AsioEP>(const std::string& host, uint16_t port) {
@@ -85,11 +94,11 @@ namespace remmy {
 
     class CommAsio : public CommBase<AsioEP>
     {
-        const static size_t HEAD_SIZE = sizeof(PKG_MAGIC_HEAD) + sizeof(uint64_t);
-        typedef decltype(PKG_MAGIC_HEAD) MagicNum;
+        static constexpr size_t HEAD_SIZE = sizeof(PKG_MAGIC_HEAD) + sizeof(uint64_t);
+        using MagicNum = decltype(PKG_MAGIC_HEAD);
 
-        const static int NUM_WORKERS = 1;
-        const static int RECEIVE_BUFFER_SIZE = 1024;
+        static constexpr int NUM_WORKERS = 1;
+        static constexpr int RECEIVE_BUFFER_SIZE = 1024;
 
         struct SocketBuffers {
             SocketBuffers() : sock(nullptr), receive_buffer(RECEIVE_BUFFER_SIZE){}
@@ -105,8 +114,8 @@ namespace remmy {
             SocketBuffers & operator=(const SocketBuffers&);
         };
 
-        typedef std::shared_ptr<SocketBuffers> SocketBuffersPtr;
-        typedef std::unordered_map<AsioEP, SocketBuffersPtr> EPSocketMap;
+        using SocketBuffersPtr = std::shared_ptr<SocketBuffers>;
+        using EPSocketMap = std::unordered_map<AsioEP, SocketBuffersPtr>;
     public:
         /*
         * \brief constructs a asio communicator, listening on a port
@@ -285,7 +294,7 @@ namespace remmy {
                 }
                 SocketBuffersPtr & socket = sockets_[remote];
                 if (socket == nullptr) {
-                    socket = SocketBuffersPtr(new SocketBuffers());
+                    socket = std::make_shared<SocketBuffers>();
                 }
                 LockGuard l2(socket->lock);
                 REMMY_ASSERT(socket->sock == nullptr, "this socket seems to have connected: %s", EPToString(remote).c_str());
@@ -357,7 +366,7 @@ namespace remmy {
         void SealMessageNoLock(SocketBuffersPtr socket, size_t package_size) {
             REMMY_LOG("A complete packet is received, size=%lld", package_size);
             // have received the whole message, pack it into MessagePtr and start receiving next one
-            MessagePtr message(new MessageType);
+            auto message = std::make_shared<MessageType>();
             message->SetRemoteAddr(socket->target);
             message->GetStreamBuffer().SetBuf(
                 (char*)socket->receive_buffer.RenewBuf(RECEIVE_BUFFER_SIZE), package_size);
@@ -378,7 +387,7 @@ namespace remmy {
             }
             else {
                 bool need_post_read = true;
-                LockGuard sl(socket->lock);
+                std::unique_lock sl(socket->lock);
                 const AsioEP & remote = socket->sock->remote_endpoint();
                 REMMY_LOG("received %llu bytes from socket", bytes_transferred);
                 socket->receive_buffer.MarkReceiveBytes(bytes_transferred);
@@ -389,7 +398,7 @@ namespace remmy {
                     MagicNum mn = *(MagicNum*)buf;
                     if (mn != PKG_MAGIC_HEAD) {
                         // someting is wrong with this connection, we should close it
-                        sl.~lock_guard();
+                        sl.unlock();
                         HandleFailure(socket, "Magic number does not match.");
                         return;
                     }
@@ -430,7 +439,7 @@ namespace remmy {
                                 REMMY_LOG("A complete packet is received, size=%lld", package_size);
                                 char * package_buf = new char[package_size - HEAD_SIZE];
                                 memcpy(package_buf, received_buf + package_start + HEAD_SIZE, package_size - HEAD_SIZE);
-                                MessagePtr message(new MessageType);
+                                auto message = std::make_shared<MessageType>();
                                 message->SetRemoteAddr(socket->target);
                                 message->GetStreamBuffer().SetBuf(package_buf, package_size - HEAD_SIZE);
                                 message->SetStatus(ErrorCode::SUCCESS);
@@ -447,7 +456,7 @@ namespace remmy {
                                     MagicNum mn = *(MagicNum*)(received_buf + package_start);
                                     if (mn != PKG_MAGIC_HEAD) {
                                         // someting is wrong with this connection, we should close it
-                                        sl.~lock_guard();
+                                        sl.unlock();
                                         HandleFailure(socket, "Magic number does not match.");
                                         return;
                                     }
@@ -480,7 +489,7 @@ namespace remmy {
                 return;
             if (socket->sock != nullptr) {
                 // notify failure by sending a special message
-                MessagePtr message(new MessageType);
+                auto message = std::make_shared<MessageType>();
                 message->SetStatus(ErrorCode::SERVER_FAIL);
                 message->SetRemoteAddr(socket->target);
                 receive_queue_.Push(message);
@@ -497,7 +506,7 @@ namespace remmy {
             if (exit_now_) return nullptr;
             SocketBuffersPtr & socket = sockets_[remote];
             if (socket == nullptr) {
-                socket = SocketBuffersPtr(new SocketBuffers());
+                socket = std::make_shared<SocketBuffers>();
                 socket->target = remote;
             }
             LockGuard sl(socket->lock);

@@ -11,6 +11,13 @@
 #include <map>
 #include <set>
 #include <thread>
+#include <tuple>
+#include <type_traits>
+#include <unordered_map>
+#include <utility>
+#include <functional>
+#include <memory>
+#include <mutex>
 #include <vector>
 
 #include "comm_asio.h"
@@ -44,17 +51,16 @@ namespace remmy {
     public:
         ProtocolFactory(Args... args) : args_(args...) {}
 
-        template <size_t... I>
-        T* create_protocol(std::index_sequence<I...>) {
-            return new T(std::get<I>(args_)...);
-        }
-
         /**
          * Creates a protocol instance.
          *
          * \return  Pointer to the newly created instance.
          */
-        virtual T* CreateProtocol(){ return create_protocol(std::index_sequence_for<Args...>()); };
+        T* CreateProtocol() override {
+            return std::apply([](auto&... args) {
+                return new T(args...);
+            }, args_);
+        }
     };
 
     /** Each ProtocolFactoryItem stores:  
@@ -80,7 +86,7 @@ namespace remmy {
      * of the message. So the receiver can tell which type of protocol the message contains. Then 
      * the receiver can query this map and get the corresponding factory, use that factory to deserialize
      * the message into a protocol instance, and call the corresponding handler. */
-    typedef std::map<uint64_t, ProtocolFactoryItem > ProtocolFactories;
+    using ProtocolFactories = std::map<uint64_t, ProtocolFactoryItem >;
 
     /**
      * A RPC stub. This is the main entry to the RPC library. It implements the logic to RPC calls,
@@ -93,10 +99,10 @@ namespace remmy {
      */
     template<class EndPointT>
     class RPCStub {
-        typedef Message<EndPointT> MessageType;
-        typedef std::shared_ptr<MessageType> MessagePtr;
-        const static uint32_t RPC_ASYNC = 1;
-        const static uint32_t RPC_SYNC = 0;
+        using MessageType = Message<EndPointT>;
+        using MessagePtr = std::shared_ptr<MessageType>;
+        static constexpr uint32_t RPC_ASYNC = 1;
+        static constexpr uint32_t RPC_SYNC = 0;
 
         /** A message header contains meta info for this message. */
         #pragma pack(push, 1)
@@ -135,6 +141,8 @@ namespace remmy {
                 worker_threads_[i] = std::thread([this, i]() {
                     SetThreadName("RPC worker ", i);
                     while (!exit_now_) {
+                        // 从接收队列取出一条消息；队列为空时阻塞当前工作线程，等待新消息。
+                        // 收到退出通知且队列已空时返回 nullptr，让当前工作线程退出。
                         MessagePtr msg = comm_->Recv();
                         if (msg == nullptr) {
                             REMMY_LOG("RPC worker %d exiting", i);
@@ -175,7 +183,7 @@ namespace remmy {
          */
         ErrorCode RpcCall(const EndPointT & ep, ProtocolBase & protocol, uint64_t timeout = 0, bool is_async = false) {
             REMMY_ASSERT(serving_, "RPCStub::StartServing() must be called before RpcCall");
-            MessagePtr message(new MessageType);
+            auto message = std::make_shared<MessageType>();
             // write header
             MessageHeader header;
             header.seq_num = GetNewSeqNum();
@@ -233,7 +241,7 @@ namespace remmy {
             const RequestTs&... reqs) {
             REMMY_ASSERT(serving_, "RPCStub::StartServing() must be called before RpcCall");
             bool is_async = false;
-            MessagePtr message(new MessageType);
+            auto message = std::make_shared<MessageType>();
             // write header
             MessageHeader header;
             header.seq_num = GetNewSeqNum();
@@ -284,7 +292,7 @@ namespace remmy {
         ErrorCode RpcCallAsync(const EndPointT& ep,
 			const RequestTs&... reqs) {
             REMMY_ASSERT(serving_, "RPCStub::StartServing() must be called before RpcCall");
-            MessagePtr message(new MessageType);
+            auto message = std::make_shared<MessageType>();
             // write header
             MessageHeader header;
             header.seq_num = GetNewSeqNum();
@@ -299,11 +307,6 @@ namespace remmy {
             return ErrorCode::SUCCESS;
         }
 
-        template <typename T>
-        struct _identity {
-            typedef T type;
-        };
-
         /**
          * Registers a protocol
          *
@@ -313,7 +316,7 @@ namespace remmy {
         template<typename ProtocolT>
         void RegisterProtocol(void* server) {
             uint64_t UID = ProtocolT().UniqueId();
-            if (protocol_factory_.find(UID) != protocol_factory_.end()) {
+            if (protocol_factory_.contains(UID)) {
                 // ID() should be unique, and should not be re-registered
                 REMMY_ABORT("Duplicate protocol id detected: %d for %s. "
                            "Did you registered the same protocol multiple times?",
@@ -335,9 +338,9 @@ namespace remmy {
          * \param [in,out] func The handler, must have form std::function<ResponseT(RequestTs...)>.
          */
         template<uint64_t UID, typename ResponseT, typename... RequestTs>
-        void RegisterSyncHandler(typename _identity<std::function<ResponseT(RequestTs&...)>>::type func) {
+        void RegisterSyncHandler(std::type_identity_t<std::function<ResponseT(RequestTs&...)>> func) {
             using CallbackT = std::function<ResponseT(RequestTs&...)>;
-            if (protocol_factory_.find(UID) != protocol_factory_.end()) {
+            if (protocol_factory_.contains(UID)) {
                 // ID() should be unique, and should not be re-registered
                 REMMY_ABORT("Duplicate protocol id detected: %d for %s. "
                            "Did you registered the same protocol multiple times?",
@@ -361,9 +364,9 @@ namespace remmy {
          * \param [in,out] func The handler, must have form std::function<ResponseT(RequestTs...)>.
          */
         template<uint64_t UID, typename... RequestTs>
-        void RegisterAsyncHandler(typename _identity<std::function<void(RequestTs&...)>>::type func) {
+        void RegisterAsyncHandler(std::type_identity_t<std::function<void(RequestTs&...)>> func) {
             using CallbackT = std::function<void(RequestTs&...)>;
-            if (protocol_factory_.find(UID) != protocol_factory_.end()) {
+            if (protocol_factory_.contains(UID)) {
                 // ID() should be unique, and should not be re-registered
                 REMMY_ABORT("Duplicate protocol id detected: %d for %s. "
                            "Did you registered the same protocol multiple times?",
@@ -387,7 +390,7 @@ namespace remmy {
          * \param [in,out] func The handler, must have form std::function<ResponseT(RequestTs...)>.
          */
         template<typename... RequestTs>
-        void RegisterAsyncHandlerReplaceable(size_t UID, typename _identity<std::function<void(RequestTs...)>>::type func) {
+        void RegisterAsyncHandlerReplaceable(size_t UID, std::type_identity_t<std::function<void(RequestTs...)>> func) {
             auto it = protocol_factory_.find(UID);
             auto new_factory = new ProtocolFactory<AsyncProtocolReplaceable<RequestTs...>, decltype(UID), decltype(func)>(UID, func);
             if ( it != protocol_factory_.end()) {
@@ -451,7 +454,7 @@ namespace remmy {
             }
             else {
                 // positive seq number indicates a request
-                if (protocol_factory_.find(header.protocol_id) == protocol_factory_.end()) {
+                if (!protocol_factory_.contains(header.protocol_id)) {
                     REMMY_ABORT("Unsupported protocol from %s, protocol ID=%d",
                                 EPToString(msg->GetRemoteAddr()).c_str(), header.protocol_id);
                     return;
@@ -466,7 +469,7 @@ namespace remmy {
                 protocol->HandleRequest(protocol_factory_[header.protocol_id].handler);
                 // send response if sync call
                 if (!header.is_async) {
-                    MessagePtr out_message(new MessageType);
+                    auto out_message = std::make_shared<MessageType>();
                     header.seq_num = -header.seq_num;
                     Serialize(out_message->GetStreamBuffer(), header);
                     protocol->MarshallResponse(out_message->GetStreamBuffer());

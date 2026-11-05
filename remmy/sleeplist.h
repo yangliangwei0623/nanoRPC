@@ -10,7 +10,7 @@
 #include "datatypes.h"
 
 namespace remmy {
-    typedef std::lock_guard<std::mutex> LockGuard;
+    using LockGuard = std::lock_guard<std::mutex>;
 
     template<class Response>
     class SleepingList {
@@ -48,29 +48,19 @@ namespace remmy {
         /// <param name="timeout">The timeout in milliseconds, default 0 indicats infinity.</param>
         /// <returns>error code</returns>
         ErrorCode WaitForResponse(int64_t event, uint64_t timeout = 0) {
-            std::unique_lock<std::mutex> l(lock_);
+            std::unique_lock l(lock_);
             ErrorCode ret = ErrorCode::SUCCESS;
             ResponseSignaled * rs = event_map_[event];
             REMMY_ASSERT(rs->response != nullptr, "null response pointer");
-            if (!rs->received) {
-                bool out_of_time = false;
-                if (timeout == 0) {
-                    // wait forever
-                    rs->cv.wait(l);
-                }
-                else {
-                    std::cv_status s =
-                        rs->cv.wait_for(l, std::chrono::milliseconds(timeout));
-                    if (s == std::cv_status::timeout) {
-                        out_of_time = true;
-                    }
-                }
-                if (out_of_time) {
-                    ret = ErrorCode::TIMEOUT;
-                }
-                else if (rs->server_failure) {
-                    ret = ErrorCode::SERVER_FAIL;
-                }
+            const auto ready = [rs] { return rs->received || rs->server_failure; };
+            if (timeout == 0) {
+                rs->cv.wait(l, ready);
+            }
+            else if (!rs->cv.wait_for(l, std::chrono::milliseconds(timeout), ready)) {
+                ret = ErrorCode::TIMEOUT;
+            }
+            if (rs->server_failure) {
+                ret = ErrorCode::SERVER_FAIL;
             }
             
             RemoveEventLocked(event);

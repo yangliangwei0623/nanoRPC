@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -29,7 +31,7 @@ namespace remmy {
         if (level < enabled_level) {
             return;
         }
-        std::lock_guard<std::mutex> l(__Log_Lock__());
+        std::lock_guard l(__Log_Lock__());
         va_list args;
 #ifdef PRINT_COMPONENT
         switch (level) {
@@ -71,32 +73,32 @@ namespace remmy {
 
 #if (REMMY_LOG_INFO >= REMMY_LOG_LEVEL)
 #define REMMY_LOG(format, ...) \
-    do{ SimpleLogger(REMMY_LOG_INFO, LOGGING_COMPONENT, __FILE__, __LINE__, REMMY_LOG_LEVEL, (format), ##__VA_ARGS__); } while (0)
+    do{ SimpleLogger(REMMY_LOG_INFO, LOGGING_COMPONENT, __FILE__, __LINE__, REMMY_LOG_LEVEL, (format) __VA_OPT__(,) __VA_ARGS__); } while (0)
 #else
 #define REMMY_LOG(...)
 #endif
 
 #if (REMMY_LOG_WARNING >= REMMY_LOG_LEVEL)
 #define REMMY_WARN(format, ...) \
-    do{ SimpleLogger(REMMY_LOG_WARNING, LOGGING_COMPONENT, __FILE__, __LINE__, REMMY_LOG_LEVEL, (format), ##__VA_ARGS__); } while (0)
+    do{ SimpleLogger(REMMY_LOG_WARNING, LOGGING_COMPONENT, __FILE__, __LINE__, REMMY_LOG_LEVEL, (format) __VA_OPT__(,) __VA_ARGS__); } while (0)
 #else
 #define REMMY_WARN(...)
 #endif
 
 #if (REMMY_LOG_ERROR >= REMMY_LOG_LEVEL)
 #define REMMY_ABORT(format, ...) \
-    do{ SimpleLogger(REMMY_LOG_ERROR, (LOGGING_COMPONENT), (__FILE__), (__LINE__), REMMY_LOG_LEVEL, (format), ##__VA_ARGS__); } while (0)
+    do{ SimpleLogger(REMMY_LOG_ERROR, (LOGGING_COMPONENT), (__FILE__), (__LINE__), REMMY_LOG_LEVEL, (format) __VA_OPT__(,) __VA_ARGS__); } while (0)
 #else
 #define REMMY_ABORT(...) REMMY_ABORT();
 #endif
 
 #if (REMMY_LOG_ASSERT >= REMMY_LOG_LEVEL)
 #define REMMY_ASSERT(pred, format, ...) \
-    do{ if (!(pred)) REMMY_ABORT((format), ##__VA_ARGS__); } while (0)
+    do{ if (!(pred)) REMMY_ABORT((format) __VA_OPT__(,) __VA_ARGS__); } while (0)
 #else
 #define REMMY_ASSERT(...)
 #endif
 
 #define SIMPLE_SUICIDE(format, ...) \
-    do{ SimpleLogger(REMMY_LOG_WARNING, (LOGGING_COMPONENT), (__FILE__), (__LINE__), REMMY_LOG_LEVEL, (format), ##__VA_ARGS__); exit(0); } while (0)
+    do{ SimpleLogger(REMMY_LOG_WARNING, (LOGGING_COMPONENT), (__FILE__), (__LINE__), REMMY_LOG_LEVEL, (format) __VA_OPT__(,) __VA_ARGS__); exit(0); } while (0)
 };

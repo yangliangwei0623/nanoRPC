@@ -14,8 +14,17 @@
       "cacheVariables": {
         "COMM_LAYER": "ASIO",
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_POLICY_VERSION_MINIMUM": "3.10",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.12",
         "CMAKE_EXPORT_COMPILE_COMMANDS": true
+      }
+    },
+    {
+      "name": "asio-release",
+      "displayName": "ASIO (Release)",
+      "inherits": "asio",
+      "binaryDir": "${sourceDir}/build/asio-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
       }
     }
   ],
@@ -24,6 +33,27 @@
       "name": "asio",
       "configurePreset": "asio",
       "jobs": 2
+    },
+    {
+      "name": "asio-release",
+      "configurePreset": "asio-release",
+      "jobs": 2
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "asio",
+      "configurePreset": "asio",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "asio-release",
+      "configurePreset": "asio-release",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

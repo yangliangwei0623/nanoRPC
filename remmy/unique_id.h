@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -27,10 +28,10 @@ namespace remmy {
         }
 
         constexpr uint64_t atom_val(const char* cstr, uint64_t interim = 0xF) {
-            return (*cstr == '\0') ?
-                interim :
-                atom_val(cstr + 1,
-                    next_interim(interim, static_cast<size_t>(*cstr)));
+            for (; *cstr != '\0'; ++cstr) {
+                interim = next_interim(interim, static_cast<size_t>(*cstr));
+            }
+            return interim;
         }
     }
 

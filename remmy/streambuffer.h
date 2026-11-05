@@ -1,7 +1,12 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
 #include <cstring>
+#include <type_traits>
+#include <utility>
 #include <memory>
 #include "logging.h"
 
@@ -10,9 +15,9 @@
 
 namespace remmy {
     class StreamBuffer {
-        const static bool SHRINK_WITH_GET = false;
-        const static size_t GROW_SIZE = 1024;
-        const static size_t RESERVED_HEADER_SPACE = 64;
+        static constexpr bool SHRINK_WITH_GET = false;
+        static constexpr size_t GROW_SIZE = 1024;
+        static constexpr size_t RESERVED_HEADER_SPACE = 64;
     public:
         /// <summary>
         /// Since we might further push some header information such as message ID
@@ -162,7 +167,7 @@ namespace remmy {
 
         template<class T>
         void WriteHead(const T & val) {
-            static_assert(std::is_pod<T>::value, "StreamBuffer::write_head(T) not implemented for this type.");
+            static_assert(std::is_standard_layout_v<T> && std::is_trivial_v<T>, "StreamBuffer::write_head(T) not implemented for this type.");
             WriteHead((char*)&val, sizeof(val));
         }
 
